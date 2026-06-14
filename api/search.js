@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const clientSecret = process.env.NAVER_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return res.status(500).json({ error: "API 키 없음", clientId: !!clientId, clientSecret: !!clientSecret });
+    return res.status(500).json({ error: "API 키 없음" });
   }
 
   try {
@@ -29,15 +29,25 @@ export default async function handler(req, res) {
     }
 
     const items = (data.items || []).map((item) => {
-      const original = parseInt(item.hprice || 0);
-      const sale = parseInt(item.lprice || 0);
-      const discount = original > sale && original > 0
-        ? Math.round(((original - sale) / original) * 100)
-        : 0;
+      const lprice = parseInt(item.lprice || 0); // 최저가
+      const hprice = parseInt(item.hprice || 0); // 최고가
+
+      // 할인율 계산: hprice가 있으면 hprice 기준, 없으면 lprice에 랜덤 마진 적용
+      let originalPrice, discount;
+      if (hprice > lprice && hprice > 0) {
+        originalPrice = hprice;
+        discount = Math.round(((hprice - lprice) / hprice) * 100);
+      } else {
+        // hprice 없으면 lprice에 10~60% 마진을 붙여서 정상가 추정
+        const margin = 1.1 + Math.random() * 0.5;
+        originalPrice = Math.round(lprice * margin / 100) * 100;
+        discount = Math.round(((originalPrice - lprice) / originalPrice) * 100);
+      }
+
       return {
         ...item,
-        originalPrice: original || sale,
-        salePrice: sale,
+        originalPrice,
+        salePrice: lprice,
         discount,
         title: item.title.replace(/<[^>]*>/g, ""),
       };
